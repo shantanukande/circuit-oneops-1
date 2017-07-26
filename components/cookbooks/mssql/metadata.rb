@@ -31,6 +31,16 @@ attribute 'feature_list',
     :order => 2
   }
 
+attribute 'tcp_port',
+  :description => 'TCP Port',
+  :required => 'required',
+  :default => '1433',
+  :format => {
+    :help => 'Specify TCP port the database instance will be listening on. The default is 1433',
+    :category => '1.Global',
+    :order => 3
+  }
+
 attribute 'sysadmins',
   :description => 'Sysadmins',
   :format => {
