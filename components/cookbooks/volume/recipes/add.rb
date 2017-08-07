@@ -619,8 +619,51 @@ ruby_block 'create-storage-non-ephemeral-volume' do
         Chef::Log.warn("logical volume #{platform_name}/#{logical_name} already exists and hence cannot recreate .. prefer replacing compute")
     end
 
-    if rfc_action == "update" && storageUpdated
-      execute_command("yes |lvextend #{l_switch} +#{size} /dev/#{platform_name}/#{logical_name}")
+
+    #lvextend will add size to existing one and extend it keeping data intact, that size should be difference between new_size and old_size
+    #Conditions covered
+    #1. User can extend peristent volume if space is available on storage
+    #2. User can extend storage and can extend volume
+    #3. Replace storage doesn't do anything, so it will not allow usre to change volume component too
+
+    check_persistent = false
+    node.workorder.payLoad[:DependsOn].each do |dep|
+      if dep["ciClassName"] =~ /Storage/
+        check_persistent = true
+        break
+      end
+    end
+
+    if ((check_persistent && rfc_action == "update" && token_class =~ /openstack/) || (rfc_action == "update" && storageUpdated))
+      new_size = node.workorder.rfcCi.ciAttributes["size"].gsub(/\s+/, "")
+      old_size = node.workorder.rfcCi.ciBaseAttributes[:size]
+
+      #if old_size is not availabe in workorder, setting old_size from actual mount point of compute
+      if old_size.nil? || old_size =~ /%/
+        details = `df -h /dev/#{platform_name}/#{logical_name}`
+        old_size = details.gsub(/\s+/m, ' ').strip.split(" ")[8]
+      end
+
+      #cheecks if user is increasing or decreasing size
+      if new_size =~ /G/ && old_size =~ /G/
+        new_size = new_size.gsub!(/[^0-9]/, '')
+        old_size = old_size.gsub!(/[^0-9]/, '')
+        size = new_size.to_i - old_size.to_i
+        if size < 0
+          exit_with_error "you cant decrese volume size"
+        end
+        size = size.to_s
+        size = size+"G"
+        Chef::Log.info("we are extending by #{size}")
+      else
+        Chef::Log.info("extending will consider volume")
+      end
+
+      #will not run if there is no change in updated volume size
+      if size != "0G"
+        execute_command("yes |lvextend #{l_switch} +#{size} /dev/#{platform_name}/#{logical_name}")
+      end
+
     end
 
     execute_command("vgchange -ay #{platform_name}")
