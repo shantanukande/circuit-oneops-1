@@ -55,7 +55,7 @@ if expires_on.nil? || expires_in_value_changed == true #auto provision is turned
 	end
 end
 
-if !expires_on.nil?
+if !expires_on.nil? && defined?(node.workorder.payLoad.ManagedVia)
 	Chef::Log.info("expiry time to be set in monitor metrics: " + Time.parse(expires_on.to_s).to_i.to_s)
 	node.set[:expiry_date_in_seconds] = Time.parse(expires_on.to_s).to_i
 
