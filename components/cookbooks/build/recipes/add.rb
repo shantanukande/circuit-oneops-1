@@ -175,7 +175,9 @@ unless _key.empty?
 
 end  
 
-if ci[:ciBaseAttributes] && ci[:ciBaseAttributes][:repository] && ci[:ciAttributes][:repository] != ci[:ciBaseAttributes][:repository]
+#if there is change in repository URL or branch name of same URL, this will delete existing installed_dir
+if (ci[:ciBaseAttributes] && ci[:ciBaseAttributes][:repository] && ci[:ciAttributes][:repository] != ci[:ciBaseAttributes][:repository]) ||
+    (ci[:ciBaseAttributes] && ci[:ciBaseAttributes][:revision] && ci[:ciAttributes][:revision] != ci[:ciBaseAttributes][:revision])
   repo_dir = "#{install_dir}/shared/latest"
   Chef::Log.info("detected change in repository url - clearing out old repo dir #{repo_dir}")
   directory "#{repo_dir}" do
