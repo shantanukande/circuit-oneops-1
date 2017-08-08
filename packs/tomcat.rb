@@ -1,7 +1,8 @@
 include_pack "genericlb"
 
 name "tomcat"
-description "Tomcat"
+owner "brett.bourquin@walmartlabs.com"
+description "Provides a Tomcat Servlet Container to deploy java web workloads"
 version "1.1"
 type "Platform"
 category "Web Application"
@@ -311,6 +312,6 @@ end
 
 policy "vulnerable-tomcat-version",
   :description => 'Using a known vulnerable version of Tomcat',
-  :query => 'ciClassName:("bom.Tomcat") AND (ciAttributes.version:("7.0") AND NOT ciAttributes.build_version:("75"))',
+  :query => 'ciClassName:("bom.Tomcat") AND (ciAttributes.version("7.0.75") OR ciAttributes.version("7.0.78") OR ciAttributes.version:("8.5.12") OR ciAttributes.version:("8.5.14"))',
   :docUrl => '',
   :mode => 'passive'
