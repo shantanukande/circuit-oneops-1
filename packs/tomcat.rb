@@ -312,6 +312,6 @@ end
 
 policy "vulnerable-tomcat-version",
   :description => 'Using a known vulnerable version of Tomcat',
-  :query => 'ciClassName:("bom.Tomcat") AND (ciAttributes.version("7.0.75") OR ciAttributes.version("7.0.78") OR ciAttributes.version:("8.5.12") OR ciAttributes.version:("8.5.14"))',
+  :query => 'ciClassName:("bom.Tomcat") AND NOT (ciAttributes.version:("7.0.75") OR ciAttributes.version:("7.0.78") OR ciAttributes.version:("8.5.12") OR ciAttributes.version:("8.5.14"))',
   :docUrl => '',
   :mode => 'passive'
