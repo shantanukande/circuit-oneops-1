@@ -20,7 +20,7 @@ suites:
         submodules: "false"
         as_group: ""
         before_migrate: ""
-        repository: "https://github.com/shantanukande/LinkedList.git"
+        repository: "https://github.com/oneops/oneops.git"
         revision: 'master'
         environment: "{}"
         password: ""
@@ -53,7 +53,7 @@ suites:
             migration_command: ""
             depth: "1"
             restart_command: ""
-            repository: "https://github.com/shantanukande/LinkedList.git"
+            repository: "https://github.com/oneops/oneops.git"
             revision: "master"
   - name: updateBuild
     run_list:
@@ -69,8 +69,8 @@ suites:
         submodules: "false"
         as_group: ""
         before_migrate: ""
-        repository: "https://github.com/shantanukande/LinkedList.git"
-        revision: 'dev-1'
+        repository: "https://github.com/oneops/oneops.git"
+        revision: 'git-url-deploy'
         environment: "{}"
         password: ""
         depth: "1"
@@ -102,8 +102,8 @@ suites:
             migration_command: ""
             depth: "1"
             restart_command: ""
-            repository: "https://github.com/shantanukande/LinkedList.git"
-            revision: "dev-1"
+            repository: "https://github.com/oneops/oneops.git"
+            revision: "git-url-deploy"
   - name: deleteBuild
     run_list:
       - recipe[kitchen-test-helper]
@@ -118,8 +118,8 @@ suites:
         submodules: "false"
         as_group: ""
         before_migrate: ""
-        repository: "https://github.com/shantanukande/LinkedList.git"
-        revision: 'dev-1'
+        repository: "https://github.com/oneops/oneops.git"
+        revision: 'master'
         environment: "{}"
         password: ""
         depth: "1"
@@ -151,6 +151,6 @@ suites:
             migration_command: ""
             depth: "1"
             restart_command: ""
-            repository: "https://github.com/shantanukande/LinkedList.git"
-            revision: "dev-1"
+            repository: "https://github.com/oneops/oneops.git"
+            revision: "master"
             install_dir: "/opt/build"
