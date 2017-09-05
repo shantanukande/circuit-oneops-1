@@ -12,6 +12,8 @@ else
   Chef::Log.info("device map not nil")
   if storage_provider =~ /cinder/
     include_recipe 'storage::add'
+  elsif storage_provider =~ /azure/
+    include_recipe "azuredatadisk::attach"
   else
     Chef::Log.info("Storage volume extension not supported")
   end
