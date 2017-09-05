@@ -71,6 +71,7 @@ end
 
 #know if this machine runs systemd
 runs_systemd = `pidof systemd`
+runs_systemd = runs_systemd.chomp.to_i
 
 template "/usr/lib/systemd/system/keysync.service" do
   source "keysync-service.erb"
