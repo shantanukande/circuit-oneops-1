@@ -45,10 +45,7 @@ class AzureSpecUtils
     resource_group_name = org[0..15] + '-' + assembly[0..15] + '-' + @node['workorder']['box']['ciId'].to_s + '-' + environment[0..15] + '-' + Utils.abbreviate_location(location)
     resource_group_name
   end
-
   def get_location
-
-
       app_type = get_app_type
       svc = get_service
 
@@ -61,9 +58,7 @@ class AzureSpecUtils
                      svc['location']
                  end
       location
-
   end
-
   def get_azure_creds
     cloud_name = get_cloud_name
     app_type = get_app_type
@@ -114,15 +109,17 @@ class AzureSpecUtils
     @node.set['platform-resource-group'] = get_resource_group_name
   end
   def is_express_route_enabled
-    set_attributes_on_node_required_for_vm_manager
-    vm_manager = AzureCompute::VirtualMachineManager.new(@node)
-    express_route_enabled = vm_manager.compute_service['express_route_enabled']
+    svc = get_service
 
-    if(express_route_enabled == "true")
-      return true
-    else
-      false
+    express_route_enabled = true
+    if svc[:express_route_enabled].nil?
+      # We cannot assume express route is enabled if it is not set
+      express_route_enabled = false
+    elsif svc[:express_route_enabled] == 'false'
+      express_route_enabled = false
     end
+
+    express_route_enabled
   end
 
   def get_server_name
@@ -137,11 +134,5 @@ class AzureSpecUtils
 
     server_name
   end
-  def get_lb_name
-    platform_name = @node['workorder']['box']['ciName']
-    plat_name = platform_name.gsub(/-/, '').downcase
-    lb_name = "lb-#{plat_name}"
 
-    lb_name
-  end
 end

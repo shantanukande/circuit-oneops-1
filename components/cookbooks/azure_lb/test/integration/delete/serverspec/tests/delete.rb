@@ -1,12 +1,16 @@
-COOKBOOKS_PATH ||= "/opt/oneops/inductor/circuit-oneops-1/components/cookbooks"
+COOKBOOKS_PATH = "/opt/oneops/inductor/circuit-oneops-1/components/cookbooks"
 
 require 'fog/azurerm'
 require "#{COOKBOOKS_PATH}/azure_lb/libraries/load_balancer.rb"
 require "#{COOKBOOKS_PATH}/azure_base/libraries/utils.rb"
 
+#load spec utils
+require "#{COOKBOOKS_PATH}/azure_base/test/integration/azure_spec_utils"
+require "#{COOKBOOKS_PATH}/azure_base/test/integration/azure_lb_spec_utils"
+
 describe 'delete azure lb' do
   before(:each) do
-    @spec_utils = AzureSpecUtils.new($node)
+    @spec_utils = AzureLBSpecUtils.new($node)
   end
 
   it 'should not exist' do
