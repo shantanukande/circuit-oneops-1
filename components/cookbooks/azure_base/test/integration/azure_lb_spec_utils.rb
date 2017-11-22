@@ -102,4 +102,17 @@ class AzureLBSpecUtils < AzureSpecUtils
 
     port
   end
+
+  def ip_belongs_to_subnet(subnets, available_ip)
+    my_ip = IPAddr.new(available_ip)
+    subnets.each do |subnet|
+      #OOLog.info(subnet.properties.address_prefix)
+      check = IPAddr.new(subnet.address_prefix)
+      if(check.include?(my_ip))
+        #OOLog.info('IP belongs to subnet : '+subnet.properties.address_prefix)
+        return subnet
+      end
+    end
+    return nil
+  end
 end

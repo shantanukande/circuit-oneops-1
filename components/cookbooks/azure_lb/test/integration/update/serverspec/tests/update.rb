@@ -38,13 +38,27 @@ describe 'azure lb' do
 
     #create the lb again
     master_rg = lb_service[:resource_group]
-
+    cloud_name = $node.workorder.cloud.ciName
     vnet_svc = AzureNetwork::VirtualNetwork.new(creds)
     vnet_svc.name = lb_service[:network]
     vnet = vnet_svc.get(master_rg)
 
+    metadata_not_change = $node.workorder.rfcCi.ciBaseAttributes.nil? || $node.workorder.rfcCi.ciBaseAttributes.empty?
+
+    xpress_route_enabled = true
+    lb_service = $node.workorder.services['lb'][cloud_name] unless $node.workorder.services['lb'].nil?
+    if lb_service[:ciAttributes][:express_route_enabled].nil?
+      xpress_route_enabled = false
+    elsif lb_service[:ciAttributes][:express_route_enabled] == 'false'
+      xpress_route_enabled = false
+    end
+
     subnets = vnet.subnets
-    subnet = vnet_svc.get_subnet_with_available_ips(subnets, true)
+    if(defined?($node[:workorder][:rfcCi][:ciAttributes][:dns_record]) && $node[:workorder][:rfcCi][:rfcAction] == 'update' && metadata_not_change)
+      subnet = @spec_utils.ip_belongs_to_subnet(subnets, $node[:workorder][:rfcCi][:ciAttributes][:dns_record])
+    else
+      subnet = vnet_svc.get_subnet_with_available_ips(subnets, xpress_route_enabled)
+    end
 
     # Frontend IP Config
     frontend_ipconfig_name = 'LB-FrontEndIP'
@@ -78,7 +92,11 @@ describe 'azure lb' do
     load_balancer = AzureNetwork::LoadBalancer.get_lb(resource_group_name, lb_name, location, frontend_ipconfigs, backend_address_pools, lb_rules, nat_rules, probes, tags)
 
     # Create LB
-    lb = lb_svc.create_update(load_balancer)
+    if(defined?($node[:workorder][:rfcCi][:ciAttributes][:dns_record]) && $node[:workorder][:rfcCi][:rfcAction] == 'update' && metadata_not_change)
+      lb = lb_svc.get(resource_group_name, lb_name)
+    else
+      lb = lb_svc.create_update(load_balancer)
+    end
     lb_ip = lb.frontend_ip_configurations[0].private_ipaddress
 
     expect(lb_ip).to eq(existing_lb_ip)
