@@ -34,7 +34,7 @@ resource "zookeeper",
          :design => true,
          :requires => {"constraint" => "1..1"},
          :attributes => {
-             'mirror' => "$OO_CLOUD{nexus}/nexus/service/local/repositories/thirdparty/content/org/apache/zookeeper/",
+             'mirror' => "$OO_CLOUD{nexus}/service/local/repositories/thirdparty/content/org/apache/zookeeper/",
              'install_dir' => "$OO_LOCAL{install_dir}",
              'version' => "$OO_LOCAL{version}",
              'jvm_args' => "-Xmx4g",
@@ -186,7 +186,7 @@ resource "java",
          :attributes => {
               :install_dir => "/usr/lib/jvm",
               :jrejdk => "jdk",
-              :binpath => "/usr/src/jdk-8u60-linux-x64.tar.gz",
+              :binpath => "",
               :version => "8",
               :sysdefault => "true",
               :flavor => "oracle"
