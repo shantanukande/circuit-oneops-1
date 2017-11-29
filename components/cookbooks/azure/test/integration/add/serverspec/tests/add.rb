@@ -44,6 +44,32 @@ describe "vm on azure" do
       expect(vm.name).to eq(server_name)
     end
 
+    context "compute size" do
+      it "should exist" do
+        credentials = @spec_utils.get_azure_creds
+        virtual_machine_lib = AzureCompute::VirtualMachine.new(credentials)
+
+        resource_group_name = @spec_utils.get_resource_group_name
+        server_name = @spec_utils.get_server_name
+        vm = virtual_machine_lib.get(resource_group_name, server_name)
+
+        default_size_mapping = {"XS"=>"Standard_A0","S"=>"Standard_A1","M"=>"Standard_A2","L"=>"Standard_A3","XL"=>"Standard_A4","XXL"=>"Standard_A5","3XL"=>"Standard_A6","4XL"=>"Standard_A7","S-CPU"=>"Standard_D1","M-CPU"=>"Standard_D2","L-CPU"=>"Standard_D3","XL-CPU"=>"Standard_D4","8XL-CPU"=>"Standard_D11","9XL-CPU"=>"Standard_D12","10XL-CPU"=>"Standard_D13","11XL-CPU"=>"Standard_D14","S-MEM"=>"Standard_DS1","M-MEM"=>"Standard_DS2","L-MEM"=>"Standard_DS3","XL-MEM"=>"Standard_DS4","8XL-MEM"=>"Standard_DS11","9XL-MEM"=>"Standard_DS12","10XL-MEM"=>"Standard_DS13","11XL-MEM"=>"Standard_DS14"}
+        expect(vm.vm_size).to eq(default_size_mapping[$node[:workorder][:rfcCi][:ciAttributes][:size]])
+      end
+    end
+
+    context "instance type" do
+      it "should exist" do
+        credentials = @spec_utils.get_azure_creds
+        virtual_machine_lib = AzureCompute::VirtualMachine.new(credentials)
+
+        resource_group_name = @spec_utils.get_resource_group_name
+        server_name = @spec_utils.get_server_name
+        vm = virtual_machine_lib.get(resource_group_name, server_name)
+        compute_instance = (vm.offer+"-"+vm.sku.to_s).downcase
+        expect(compute_instance).to eq($node[:workorder][:payLoad][:os][0][:ciAttributes]['ostype'].downcase)
+      end
+    end
 
     it "has oneops org and assembly tags" do
       tags_from_work_order = Utils.get_resource_tags($node)
