@@ -207,60 +207,12 @@ resource "hostname",
            :ptr_source => "instance"
         }
 
-resource "volume-log",
-  :cookbook => "oneops.1.volume",
-  :design => true,
-  :requires => { "constraint" => "1..1", "services" => "compute" },
-  :attributes => {  "mount_point"   => '/log',
-                    "size"          => '100%FREE',
-                    "device"        => '',
-                    "fstype"        => 'ext4',
-                    "options"       => ''
-                 },
-  :monitors => {
-      'usage' =>  {'description' => 'Usage',
-                  'chart' => {'min'=>0,'unit'=> 'Percent used'},
-                  'cmd' => 'check_disk_use!:::node.workorder.rfcCi.ciAttributes.mount_point:::',
-                  'cmd_line' => '/opt/nagios/libexec/check_disk_use.sh $ARG1$',
-                  'metrics' => { 'space_used' => metric( :unit => '%', :description => 'Disk Space Percent Used'),
-                                 'inode_used' => metric( :unit => '%', :description => 'Disk Inode Percent Used') },
-                  :thresholds => {
-                    'LowDiskSpace' => threshold('5m','avg','space_used',trigger('>',90,5,1),reset('<',90,5,1)),
-                    'LowDiskInode' => threshold('5m','avg','inode_used',trigger('>',90,5,1),reset('<',90,5,1)),
-                  },
-                },
-    }
-
 resource "volume",
   :cookbook => "oneops.1.volume",
   :design => true,
-  :requires => { "constraint" => "0..1", "services" => "compute" },
+  :requires => { "constraint" => "0..*", "services" => "compute" },
   :attributes => {  "mount_point"   => '/data',
-                    "size"          => '60%VG',
-                    "device"        => '',
-                    "fstype"        => 'ext4',
-                    "options"       => ''
-                 },
-  :monitors => {
-      'usage' =>  {'description' => 'Usage',
-                  'chart' => {'min'=>0,'unit'=> 'Percent used'},
-                  'cmd' => 'check_disk_use!:::node.workorder.rfcCi.ciAttributes.mount_point:::',
-                  'cmd_line' => '/opt/nagios/libexec/check_disk_use.sh $ARG1$',
-                  'metrics' => { 'space_used' => metric( :unit => '%', :description => 'Disk Space Percent Used'),
-                                 'inode_used' => metric( :unit => '%', :description => 'Disk Inode Percent Used') },
-                  :thresholds => {
-                    'LowDiskSpace' => threshold('5m','avg','space_used',trigger('>',90,5,1),reset('<',90,5,1)),
-                    'LowDiskInode' => threshold('5m','avg','inode_used',trigger('>',90,5,1),reset('<',90,5,1)),
-                  },
-                }
-    }
-
-resource "volume-app",
-  :cookbook => "oneops.1.volume",
-  :design => true,
-  :requires => { "constraint" => "1..1", "services" => "compute" },
-  :attributes => {  "mount_point"   => '/app',
-                    "size"          => '10G',
+                    "size"          => '100%FREE',
                     "device"        => '',
                     "fstype"        => 'ext4',
                     "options"       => ''
@@ -312,7 +264,7 @@ resource "jolokia_proxy",
         :description => 'JolokiaProxyProcess',
         :source => '',
         :chart => {'min' => '0', 'max' => '100', 'unit' => 'Percent'},
-        :cmd => 'check_process!jolokia_proxy!true!/app/metrics_collector/pid/jetty.pid',
+        :cmd => 'check_process!jolokia_proxy!false!/opt/metrics_collector/jetty_base/jetty.state',
         :cmd_line => '/opt/nagios/libexec/check_process.sh "$ARG1$" "$ARG2$" "$ARG3$"',
         :metrics => {
             'up' => metric(:unit => '%', :description => 'Percent Up'),
@@ -325,20 +277,14 @@ resource "jolokia_proxy",
 
 # depends_on
 [
-  {:from => 'volume-log', :to => 'os'},
-  {:from => 'volume-log', :to => 'volume'},
   {:from => 'volume', :to => 'user-zookeeper'},
   {:from => 'volume', :to => 'os'},
-  {:from => 'volume-app', :to => 'os'},
   {:from => 'user-zookeeper', :to => 'os'},
   {:from => 'zookeeper', :to => 'user-zookeeper'},
   {:from => 'zookeeper', :to => 'os'},
   {:from => 'artifact', :to => 'user-zookeeper'},
   {:from => 'artifact', :to => 'os'},
-  {:from => 'zookeeper', :to => 'volume-app'},
-  {:from => 'zookeeper', :to => 'volume-log'},
   {:from => 'zookeeper', :to => 'hostname'},
-  {:from => 'volume-log', :to => 'volume-app'},
   {:from => 'zookeeper', :to => 'java'},
   {:from => 'java', :to => 'os'},
   {:from => 'diskcleanup-job', :to => 'os'},
@@ -408,7 +354,7 @@ end
     :attributes    => { }
 end
 # managed_via
-['jolokia_proxy','diskcleanup-job','user-zookeeper', 'artifact', 'zookeeper', 'java', 'library', 'volume-log', 'volume-app', 'volume'].each do |from|
+['jolokia_proxy','diskcleanup-job','user-zookeeper', 'artifact', 'zookeeper', 'java', 'library', 'volume'].each do |from|
   relation "#{from}::managed_via::compute",
            :except => ['_default'],
            :relation_name => 'ManagedVia',
