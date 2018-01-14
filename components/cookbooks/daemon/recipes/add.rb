@@ -26,11 +26,12 @@ control_script_location = attrs[:control_script_location] || ''
 control_script_content = attrs[:control_script_content] || ''
 
 service_type = nil
-initService = `ls /etc/init.d/#{service_name}`
-systemdService = `ls /usr/lib/systemd/system/#{service_name}.service`
-if systemdService.include?("/usr/lib/systemd/system/#{service_name}.service")
+initService = "/etc/init.d/#{service_name}"
+systemdService = "/usr/lib/systemd/system/#{service_name}.service"
+
+if File.exist?(systemdService)
   service_type = "systemd"
-elsif initService.include?("/etc/init.d/#{service_name}")
+elsif File.exist?(initService)
   service_type = "init"
 end
 
@@ -45,12 +46,6 @@ file "#{control_script_location}" do
   mode "0755"
   content "#{control_script_content}".gsub(/\r\n?/,"\n")
   action :create
-end
-
-# enable daemon service
-service "#{service_name}" do
-  provider Chef::Provider::Service::Init if service_type == "init"
-  action :enable
 end
 
 # restart daemon service when pattern has not been specified

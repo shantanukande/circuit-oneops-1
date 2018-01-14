@@ -7,11 +7,12 @@ service_name = attrs[:service_name]
 pat = attrs[:pattern] || ''
 
 service_type = nil
-initService = `ls /ect/init.d/#{service_name}`
-systemdService = `ls /usr/lib/systemd/system/#{service_name}.service`
-if systemdService.include?("/usr/lib/systemd/system/#{service_name}.service")
+initService = "/etc/init.d/#{service_name}"
+systemdService = "/usr/lib/systemd/system/#{service_name}.service"
+
+if File.exist?(systemdService)
 	service_type = "systemd"
-elsif initService.include?("/etc/init.d/#{service_name}")
+elsif File.exist?(initService)
 	service_type = "init"
 end
 
