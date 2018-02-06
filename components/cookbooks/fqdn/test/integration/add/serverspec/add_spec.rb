@@ -277,6 +277,7 @@ else
     full_aliases.each do |full|
       next if $node['dns_action'] == "delete" && !$node['is_last_active_cloud']
 
+      has_wildcard = $node['workorder']['rfcCi']['ciAttributes']['full_aliases'] =~ /\*/
       full_value = primary_platform_dns_name
       if $node.has_key?("gslb_domain") && !$node['gslb_domain'].nil?
         full_value = $node['gslb_domain']
@@ -292,6 +293,13 @@ else
           expect(result).to include(full_value)
         end
       end
+
+      describe "wildcard entry in FQDN" do
+        it "entry should be enabled" do
+          is_wildcard_enabled = lib.is_wildcard_enabled
+          expect(is_wildcard_enabled).to eq(true)
+        end
+      end if has_wildcard
 
     end
   end

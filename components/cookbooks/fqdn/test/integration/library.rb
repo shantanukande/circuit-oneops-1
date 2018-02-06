@@ -154,4 +154,16 @@ class Library
     return [env_name, platform_name, asmb_name, dc_name, ci["ciId"].to_s, "gslbsrvc"].join("-")
   end
 
+  def is_wildcard_enabled
+    if $node['workorder'].has_key?('config') && !$node['workorder']['config'].empty?
+      config = $node['workorder']['config']
+      if config.has_key?('is_wildcard_enabled') && !config['is_wildcard_enabled'].empty? && config['is_wildcard_enabled'] == 'true'
+        return true
+      else
+        return false
+      end
+    end
+    return false
+  end
+
 end
