@@ -1,5 +1,6 @@
 require 'excon'
 require 'pp'
+require "#{COOKBOOKS_PATH}/netscaler/test/integration/netscaler_spec_utils"
 
 cloud_name = $node['workorder']['cloud']['ciName']
 lb_service_type = $node['lb']['lb_service_type']
@@ -50,17 +51,10 @@ if $node['workorder']['rfcCi'].has_key?('ciAttributes') &&
   end
 end
 
+netscalar_spec_utils = NetscalerSpecUtils.new($node)
+netscalar_spec_utils.get_connection
 
-host = cloud_service['ciAttributes']['host']
-
-encoded = Base64.encode64("#{cloud_service['ciAttributes']['username']}:#{cloud_service['ciAttributes']['password']}").gsub("\n","")
-conn = Excon.new(
-    'https://'+host,
-    :headers => {
-        'Authorization' => "Basic #{encoded}",
-        'Content-Type' => 'application/x-www-form-urlencoded'
-    },
-    :ssl_verify_peer => false)
+conn = $node['ns_conn']
 
 resp_obj = JSON.parse(conn.request(
     :method=>:get,

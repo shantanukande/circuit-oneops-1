@@ -3,8 +3,11 @@ COOKBOOKS_PATH = "#{CIRCUIT_PATH}/components/cookbooks".freeze
 
 require "#{CIRCUIT_PATH}/components/spec_helper.rb"
 require "#{COOKBOOKS_PATH}/azure_base/test/integration/spec_utils"
+require "#{COOKBOOKS_PATH}/lb/test/integration/lb_spec_utils"
 
 cloud_service = SpecUtils.new($node).get_cloud_service['ciClassName'].split('.').last.downcase
+lb_spec_utils = LbSpecUtils.new($node)
+lb_spec_utils.initialize_lb_name
 if cloud_service =~ /azure_lb|azuregateway/
   require "#{COOKBOOKS_PATH}/azure_base/test/integration/azure_spec_utils"
 end

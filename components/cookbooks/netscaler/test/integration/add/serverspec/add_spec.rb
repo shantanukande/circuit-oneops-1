@@ -1,5 +1,6 @@
 require 'pp'
 require 'excon'
+require "#{COOKBOOKS_PATH}/netscaler/test/integration/netscaler_spec_utils"
 
 cloud_name = $node['workorder']['cloud']['ciName']
 lb_service_type = $node['lb']['lb_service_type']
@@ -57,16 +58,9 @@ else
   end
 end
 
-host = cloud_service['ciAttributes']['host']
-
-encoded = Base64.encode64("#{cloud_service['ciAttributes']['username']}:#{cloud_service['ciAttributes']['password']}").gsub("\n","")
-conn = Excon.new(
-    'https://'+host,
-    :headers => {
-        'Authorization' => "Basic #{encoded}",
-        'Content-Type' => 'application/x-www-form-urlencoded'
-    },
-    :ssl_verify_peer => false)
+netscalar_spec_utils = NetscalerSpecUtils.new($node)
+netscalar_spec_utils.get_connection
+conn = $node['ns_conn']
 
 resp_obj = JSON.parse(conn.request(
     :method=>:get,
@@ -74,12 +68,11 @@ resp_obj = JSON.parse(conn.request(
 
 exists = resp_obj["message"] =~ /Done/ ? true : false
 
-# disabled because of bug
-# context "lbserver" do
-#   it "should exist" do
-#     expect(exists).to eq(true)
-#   end
-# end
+context "lbserver" do
+  it "should exist" do
+    expect(exists).to eq(true)
+  end
+end
 
 if exists
   lbip = resp_obj["lbvserver"][0]["ipv46"]
@@ -103,12 +96,11 @@ resp_obj = JSON.parse(conn.request(
 
 exists = resp_obj["message"] =~ /Done/ ? true : false
 
-# disabled because of bug
-# context "lbserver_servicegroup" do
-#   it "should exist" do
-#     expect(exists).to eq(true)
-#   end
-# end
+context "lbserver_servicegroup" do
+  it "should exist" do
+    expect(exists).to eq(true)
+  end
+end
 
 if exists
   bindings = resp_obj["lbvserver_servicegroup_binding"]
