@@ -51,7 +51,8 @@ if $node['workorder']['services'].has_key?('gdns') &&
 end
 
 if env.has_key?("global_dns") && env["global_dns"] == "true" && depends_on_lb &&
-    !gdns_service.nil? && gdns_service["ciAttributes"]["gslb_authoritative_servers"] != '[]'
+    !gdns_service.nil? && gdns_service["ciAttributes"]["gslb_authoritative_servers"] != '[]' &&
+    $node['workorder']['cloud']['ciAttributes']['priority'] == "1" && $node['is_last_active_cloud_in_dc']
 
   cloud_service= nil
   cloud_name = $node['workorder']['cloud']['ciName']

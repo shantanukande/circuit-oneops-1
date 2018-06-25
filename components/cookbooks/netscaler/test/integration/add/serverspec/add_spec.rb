@@ -74,10 +74,28 @@ context "lbserver" do
   end
 end
 
+backupvserver = nil
+($node[:workorder].has_key?('config') && $node[:workorder][:config].has_key?('backupvserver'))   ? (backupvserver_flag = $node[:workorder][:config][:backupvserver])      : (backupvserver_flag = 'false')
+($node[:workorder].has_key?('config') && $node[:workorder][:config].has_key?('DC_Backupvserver'))   ? (dc_backvserver_list = $node[:workorder][:config][:DC_Backupvserver])      : (dc_backvserver_list = nil)
+
+
+enaled_backupvserver = false
+if backupvserver_flag.to_s.downcase == "true"
+  unless dc_backvserver_list.nil? || dc_backvserver_list.empty?
+    dc_backvserver_list.split(",").each do |dc|
+      if cloud_name.include? dc
+        enaled_backupvserver = true
+        break
+      end
+    end
+  end
+end
+
 if exists
   lbip = resp_obj["lbvserver"][0]["ipv46"]
   lbservicetype = resp_obj["lbvserver"][0]["servicetype"]
   lb_lbmethod = resp_obj["lbvserver"][0]["lbmethod"].downcase
+
   lbmethod = $node['workorder']['rfcCi']['ciAttributes']['lbmethod']
 
   context "configuration entries" do
@@ -85,6 +103,40 @@ if exists
       expect(lbip).not_to be_nil
       expect(lbservicetype).to eq(servicetype)
       expect(lb_lbmethod).to eq(lbmethod)
+    end
+  end
+
+  if enaled_backupvserver
+    backupvserver = resp_obj["lbvserver"][0]["backupvserver"]
+    context "Backup server info in primary VIP" do
+      it "should exist" do
+        expect(backupvserver).not_to be_nil
+      end
+    end
+  end
+end
+
+if !backupvserver.nil?
+  resp_obj = JSON.parse(conn.request(
+      :method=>:get,
+      :path=>"/nitro/v1/config/lbvserver/#{backupvserver}").body)
+
+  exists = resp_obj["message"] =~ /Done/ ? true : false
+
+  context "backup lbserver" do
+    it "should exist" do
+      expect(exists).to eq(true)
+    end
+  end
+
+  resp_obj = JSON.parse(conn.request(
+      :method=>:get,
+      :path=>"/nitro/v1/config/lbvserver_responderpolicy_binding/#{backupvserver}").body)
+
+  policyname = resp_obj["lbvserver_responderpolicy_binding"][0]['policyname']
+  context "listenpolicy on baclup lbvserver" do
+    it "should exist" do
+      expect(policyname).to eq("Restrict_GSLB_prob_respol")
     end
   end
 end
@@ -106,73 +158,86 @@ if exists
   bindings = resp_obj["lbvserver_servicegroup_binding"]
 end
 
-if !bindings.nil?
+is_secondary = false
+if $node['workorder']['cloud']['ciAttributes'].has_key?('priority') &&
+    $node['workorder']['cloud']['ciAttributes']['priority'].to_i != 1
+
+  is_secondary = true
+
+end
+
+cloud_name = $node['workorder']['cloud']['ciName']
+if !bindings.nil? && !is_secondary
   !bindings.each do |sg|
     sg_name = sg["servicegroupname"]
-    resp_obj = JSON.parse(conn.request(:method=>:get, :path=>"/nitro/v1/config/servicegroup/#{sg_name}").body)
 
-    exists = resp_obj["message"] =~ /Done/ ? true : false
-    context "servicegroup" do
-      it "should exist" do
-        expect(exists).to eq(true)
+    if sg_name.include? cloud_name
+      resp_obj = JSON.parse(conn.request(:method=>:get, :path=>"/nitro/v1/config/servicegroup/#{sg_name}").body)
+
+      exists = resp_obj["message"] =~ /Done/ ? true : false
+      context "servicegroup" do
+        it "should exist" do
+          expect(exists).to eq(true)
+        end
       end
-    end
 
-    resp_obj = JSON.parse(conn.request(:method=>:get, :path=>"/nitro/v1/config/servicegroup_servicegroupmember_binding/#{sg_name}").body)
+      resp_obj = JSON.parse(conn.request(:method=>:get, :path=>"/nitro/v1/config/servicegroup_servicegroupmember_binding/#{sg_name}").body)
 
-    exists = resp_obj["message"] =~ /Done/ ? true : false
-    context "servicegroup servicegroupmember binding" do
-      it "should exist" do
-        expect(exists).to eq(true)
+      exists = resp_obj["message"] =~ /Done/ ? true : false
+      context "servicegroup servicegroupmember binding" do
+        it "should exist" do
+          expect(exists).to eq(true)
+        end
       end
-    end
 
-    servicegroup_servicegroupmember_binding = ""
+      servicegroup_servicegroupmember_binding = ""
 
-    if  exists
-      sg_members = resp_obj["servicegroup_servicegroupmember_binding"]
-      servicegroup_servicegroupmember_binding += "servicegroupmembers of: #{sg_name}\n"
-      servicegroup_servicegroupmember_binding += PP.pp sg_members, ""
+      if  exists
+        sg_members = resp_obj["servicegroup_servicegroupmember_binding"]
+        servicegroup_servicegroupmember_binding += "servicegroupmembers of: #{sg_name}\n"
+        servicegroup_servicegroupmember_binding += PP.pp sg_members, ""
 
-      $node['workorder']['payLoad']['DependsOn'].each do |dep|
-        if defined?(dep['ciAttributes']['public_ip'])
-          ip = dep['ciAttributes']['public_ip'].to_s
+        $node['workorder']['payLoad']['DependsOn'].each do |dep|
+          if defined?(dep['ciAttributes']['public_ip'])
+            ip = dep['ciAttributes']['public_ip'].to_s
 
-          context "compute IP" do
+            context "compute IP" do
+              it "should exist" do
+                expect(servicegroup_servicegroupmember_binding).to include(ip)
+              end
+            end
+
+          end
+
+        end
+      end
+
+      resp_obj = JSON.parse(conn.request(:method=>:get,
+                                         :path=>"/nitro/v1/config/servicegroup_lbmonitor_binding/#{sg_name}").body)
+
+      exists = resp_obj["message"] =~ /Done/ ? true : false
+      context "servicegroup lbmonitor binding" do
+        it "should exist" do
+          expect(exists).to eq(true)
+        end
+      end
+
+      if exists
+        sg_monitors = resp_obj["servicegroup_lbmonitor_binding"]
+        sg_monitors.each do |mon|
+          mon_name = mon["monitor_name"]
+          resp_obj = JSON.parse(conn.request(:method=>:get, :path=>"/nitro/v1/config/lbmonitor/#{mon_name}").body)
+
+          exists = resp_obj["message"] =~ /Done/ ? true : false
+          context "lbmonitor" do
             it "should exist" do
-              expect(servicegroup_servicegroupmember_binding).to include(ip)
+              expect(exists).to eq(true)
             end
           end
-
-        end
-
-      end
-    end
-
-    resp_obj = JSON.parse(conn.request(:method=>:get,
-                                       :path=>"/nitro/v1/config/servicegroup_lbmonitor_binding/#{sg_name}").body)
-
-    exists = resp_obj["message"] =~ /Done/ ? true : false
-    context "servicegroup lbmonitor binding" do
-      it "should exist" do
-        expect(exists).to eq(true)
-      end
-    end
-
-    if exists
-      sg_monitors = resp_obj["servicegroup_lbmonitor_binding"]
-      sg_monitors.each do |mon|
-        mon_name = mon["monitor_name"]
-        resp_obj = JSON.parse(conn.request(:method=>:get, :path=>"/nitro/v1/config/lbmonitor/#{mon_name}").body)
-
-        exists = resp_obj["message"] =~ /Done/ ? true : false
-        context "lbmonitor" do
-          it "should exist" do
-            expect(exists).to eq(true)
-          end
         end
       end
     end
+
   end
 end
 

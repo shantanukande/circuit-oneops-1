@@ -74,7 +74,7 @@ def clear_non_generic_monitor(conn,servicegroup_name,monitor_name)
 end
 
 sg_names = []
-lbs = [] + node.loadbalancers + node.dcloadbalancers
+lbs = [] + node.loadbalancers + node.dcloadbalancers + node.backup_dcloadbalancers
 
 env_name = node.workorder.payLoad.Environment[0]["ciName"]
 platform_name = node.workorder.box.ciName
@@ -359,42 +359,70 @@ lbs.each do |lb|
      Chef::Log.info("lbvserver_servicegroup_binding filtered: "+binding.inspect)
   end
 
-  if binding.size == 0 && !lb.has_key?("is_secondary")
+  is_backup_lbvserver = false
+  if lb.has_key?('is_backup_lbvserver')
+    is_backup_lbvserver = lb.is_backup_lbvserver
+  end
 
-    binding = { :name => lb_name, :servicegroupname => sg_name }
-    req = '{ "lbvserver_servicegroup_binding" : '+JSON.dump(binding)+ '}'
-    resp_obj = JSON.parse(node.ns_conn.request(
-      :method=>:put,
-      :path=>"/nitro/v1/config/",
-      :body => req).body)
 
-    if resp_obj["errorcode"] != 0
-      Chef::Log.error( "post bind #{sg_name} to #{lb_name} resp: #{resp_obj.inspect}")
-      exit 1
+  if !is_backup_lbvserver
+    if binding.size == 0 && !lb.has_key?("is_secondary")
+
+      binding = { :name => lb_name, :servicegroupname => sg_name }
+      req = '{ "lbvserver_servicegroup_binding" : '+JSON.dump(binding)+ '}'
+      resp_obj = JSON.parse(node.ns_conn.request(
+          :method=>:put,
+          :path=>"/nitro/v1/config/",
+          :body => req).body)
+
+      if resp_obj["errorcode"] != 0
+        Chef::Log.error( "post bind #{sg_name} to #{lb_name} resp: #{resp_obj.inspect}")
+        exit 1
+      else
+        Chef::Log.info( "post bind #{sg_name} to #{lb_name} resp: #{resp_obj.inspect}")
+      end
+
+    elsif binding.size >0 && lb.has_key?("is_secondary")
+
+      binding = { :name => lb_name, :servicegroupname => sg_name }
+      req = 'object={"params":{"action": "unbind"}, "lbvserver_servicegroup_binding" : ' + JSON.dump(binding) + '}'
+      resp_obj = JSON.parse(node.ns_conn.request(
+          :method=> :post,
+          :path=>"/nitro/v1/config/lbvserver_servicegroup_binding/#{lb_name}",
+          :body => req).body)
+
+      if resp_obj["errorcode"] != 0
+        Chef::Log.error( "delete bind #{sg_name} to #{lb_name} resp: #{resp_obj.inspect}")
+        exit 1
+      else
+        Chef::Log.info( "delete bind #{sg_name} to #{lb_name} resp: #{resp_obj.inspect}")
+      end
+
+    elsif binding.size == 0 && lb.has_key?("is_secondary")
+      Chef::Log.info( "bind doesn't exist and shouldn't because the cloud is not primary")
     else
-      Chef::Log.info( "post bind #{sg_name} to #{lb_name} resp: #{resp_obj.inspect}")
+      Chef::Log.info( "bind exists: #{binding.inspect}")
     end
-
-  elsif binding.size >0 && lb.has_key?("is_secondary")
-
-    binding = { :name => lb_name, :servicegroupname => sg_name }
-    req = 'object={"params":{"action": "unbind"}, "lbvserver_servicegroup_binding" : ' + JSON.dump(binding) + '}'
-    resp_obj = JSON.parse(node.ns_conn.request(
-      :method=> :post,
-      :path=>"/nitro/v1/config/lbvserver_servicegroup_binding/#{lb_name}",
-      :body => req).body)
-
-    if resp_obj["errorcode"] != 0
-      Chef::Log.error( "delete bind #{sg_name} to #{lb_name} resp: #{resp_obj.inspect}")
-      exit 1
-    else
-      Chef::Log.info( "delete bind #{sg_name} to #{lb_name} resp: #{resp_obj.inspect}")
-    end
-
-  elsif binding.size == 0 && lb.has_key?("is_secondary")
-    Chef::Log.info( "bind doesn't exist and shouldn't because the cloud is not primary")
   else
-    Chef::Log.info( "bind exists: #{binding.inspect}")
+    Chef::Log.info( "binding service groups to back_dc_lbvserver")
+    if binding.size == 0
+
+      binding = { :name => lb_name, :servicegroupname => sg_name }
+      req = '{ "lbvserver_servicegroup_binding" : '+JSON.dump(binding)+ '}'
+      resp_obj = JSON.parse(node.ns_conn.request(
+          :method=>:put,
+          :path=>"/nitro/v1/config/",
+          :body => req).body)
+
+      if resp_obj["errorcode"] != 0
+        Chef::Log.error( "post bind #{sg_name} to #{lb_name} resp: #{resp_obj.inspect}")
+        exit 1
+      else
+        Chef::Log.info( "post bind #{sg_name} to #{lb_name} resp: #{resp_obj.inspect}")
+      end
+    else
+      Chef::Log.info( "bind exists: #{binding.inspect}")
+    end
   end
 
 end

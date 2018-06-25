@@ -24,8 +24,9 @@ n.run_action(:create)
 
 
 include_recipe "netscaler::delete_lb_group"
+include_recipe "netscaler::backup_delete_lb_group"
 
-lbs = node.loadbalancers + node.dcloadbalancers
+lbs = node.loadbalancers + node.dcloadbalancers + node.backup_dcloadbalancers
 lbs.each do |lb|
 
   lbvserver_name = lb['name']  

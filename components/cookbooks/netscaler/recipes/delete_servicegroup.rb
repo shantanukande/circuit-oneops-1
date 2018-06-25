@@ -21,7 +21,7 @@ n = netscaler_connection "conn" do
 end
 n.run_action(:create)
 
-lbs = node.loadbalancers + node.dcloadbalancers
+lbs = node.loadbalancers + node.dcloadbalancers + node.backup_dcloadbalancers
 
 deleted_list = []
 

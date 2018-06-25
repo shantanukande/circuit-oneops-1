@@ -38,6 +38,7 @@ end
 exit_with_error "no cloud service defined or empty" if cloud_service.nil?
 
 include_recipe "lb::build_load_balancers"
+include_recipe "lb::build_backup_load_balancers"
 lb_name = node[:lb_name]
 
 instances = Array.new
@@ -77,6 +78,7 @@ when /netscaler/
   
   include_recipe "netscaler::stonith"                
   include_recipe "netscaler::add_server"
+  include_recipe "netscaler::add_backup_lbvserver"
   include_recipe "netscaler::add_lbvserver"
   include_recipe "netscaler::add_servicegroup"  
   include_recipe "netscaler::logout"

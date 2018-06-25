@@ -20,6 +20,7 @@ platform_name = node.workorder.box.ciName
 rfcCi = node.workorder.rfcCi
 
 include_recipe "lb::build_load_balancers"
+include_recipe "lb::build_backup_load_balancers"
 lb_name = node[:lb_name]
 
 

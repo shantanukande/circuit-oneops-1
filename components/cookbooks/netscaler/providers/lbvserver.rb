@@ -153,7 +153,17 @@ end
 
 
 def create_lbvserver
-  lbvserver_name = @new_resource.name  
+  lbvserver_name = @new_resource.name
+
+  is_dc_lbvserver = false
+  node.dcloadbalancers.each do |lb|
+    if lb[:name] == lbvserver_name
+      Chef::Log.debug("lbvserver in creation is dc level")
+      is_dc_lbvserver = true
+      break
+    end
+  end
+
   Chef::Log.info("lbvserver_name: #{lbvserver_name}")
   if lbvserver_name.size > 127
     Chef::Log.error("lbvserver_name too long - max 127")
@@ -237,6 +247,26 @@ def create_lbvserver
     
     if !@new_resource.backupvserver.nil? && !@new_resource.backupvserver.empty?
       lbvserver[:backupVserver] = @new_resource.backupvserver
+    elsif !node.backup_dcloadbalancers.nil? && !node.backup_dcloadbalancers.empty? && is_dc_lbvserver
+      node.backup_dcloadbalancers.each do |backup_lb|
+        if backup_lb.name.include? lbvserver_name
+          Chef::Log.info("Adding backup server")
+
+          resp_obj = JSON.parse(@new_resource.connection.request(
+              :method => :get,
+              :path => "/nitro/v1/config/lbvserver/#{backup_lb.name}").body)
+
+          if resp_obj["errorcode"] != 0
+            Chef::Log.error( "backup_lbvserver #{backup_lb.name} resp: #{resp.inspect}")
+            exit 1
+          else
+            Chef::Log.info( "found valid backup_lbveserver #{backup_lb.name}")
+            lbvserver[:backupVserver] = backup_lb.name
+            puts "***TAG:backup lbvserver info = PrimaryVIP : #{lbvserver_name}, backupvip_NSpath : #{node.workorder.rfcCi.nsPath}, backupVIP : #{backup_lb.name}"
+          end
+          break
+        end
+      end
     end
 
     Chef::Log.info("new lbvserver: #{lbvserver.inspect}")
@@ -313,10 +343,30 @@ def create_lbvserver
     if node.workorder.rfcCi.ciAttributes.has_key?("lb_attrs")
       custom_attrs = JSON.parse(node.workorder.rfcCi.ciAttributes.lb_attrs)
     end
-    lbvserver = lbvserver_base.merge(custom_attrs)    
-        
+    lbvserver = lbvserver_base.merge(custom_attrs)
+
     if !@new_resource.backupvserver.nil? && !@new_resource.backupvserver.empty?
       lbvserver[:backupVserver] = @new_resource.backupvserver
+    elsif !node.backup_dcloadbalancers.nil? && !node.backup_dcloadbalancers.empty? && is_dc_lbvserver
+      node.backup_dcloadbalancers.each do |backup_lb|
+        if backup_lb.name.include? lbvserver_name
+          Chef::Log.info("Adding backup server on update")
+
+          resp_obj = JSON.parse(@new_resource.connection.request(
+              :method => :get,
+              :path => "/nitro/v1/config/lbvserver/#{backup_lb.name}").body)
+
+          if resp_obj["errorcode"] != 0
+            Chef::Log.error( "backup_lbvserver #{backup_lb.name} resp: #{resp.inspect}")
+            exit 1
+          else
+            Chef::Log.info( "found valid backup_lbveserver #{backup_lb.name}")
+            lbvserver[:backupVserver] = backup_lb.name
+            puts "***TAG:backup lbvserver info = PrimaryVIP : #{lbvserver_name}, backupvip_NSpath : #{node.workorder.rfcCi.nsPath}, backupVIP : #{backup_lb.name}"
+          end
+          break
+        end
+      end
     end
 
     if @new_resource.stickiness.nil?
@@ -385,14 +435,203 @@ def create_lbvserver
   vservers = {}.merge existing_vservers
   vservers[lbvserver_name] = node["ns_lbvserver_ip"]
   node.set["vnames"] = vservers
+end
 
-  
+def create_backup_lbvserver
+  lbvserver_name = @new_resource.name
+  Chef::Log.info("lbvserver_name: #{lbvserver_name}")
+  if lbvserver_name.size > 127
+    Chef::Log.error("lbvserver_name too long - max 127")
+    exit 1
+  end
 
+  # check for server
+  resp_obj = JSON.parse(@new_resource.connection.request(
+      :method => :get,
+      :path => "/nitro/v1/config/lbvserver/#{lbvserver_name}").body)
+
+  Chef::Log.info("get lbvserver response: #{resp_obj.inspect}")
+
+  req = nil
+  method = :put
+
+  # check exists
+  if resp_obj["message"] =~ /No such resource/
+    ip = @new_resource.ipv46
+
+    #Re-Use IP from Nitro Netscaler API
+    lbparts = lbvserver_name.split("-")
+    lbparts.pop #Remove lb
+    lbparts.pop #Remove ciid
+    lbparts.pop #Remove proto-port
+    domain = lbparts.join("-")
+
+    lbvserver_base = {
+        :name => lbvserver_name,
+        :ipv46 => ip,
+        :port =>  @new_resource.port,
+        :servicetype => @new_resource.servicetype,
+        :lbmethod => @new_resource.lbmethod
+    }
+
+    custom_attrs = {}
+    if node.workorder.rfcCi.ciAttributes.has_key?("lb_attrs")
+      custom_attrs = JSON.parse(node.workorder.rfcCi.ciAttributes.lb_attrs)
+    end
+    lbvserver = lbvserver_base.merge(custom_attrs)
+
+    if @new_resource.stickiness == "true"
+      if ["SSL","HTTPS","HTTP"].include?(@new_resource.servicetype.upcase)
+        lbvserver[:persistenceType] = "COOKIEINSERT"
+      else
+        lbvserver[:persistenceType] = "SOURCEIP"
+      end
+      lbvserver[:timeout] = 360
+
+    end
+
+    Chef::Log.info("new backup lbvserver: #{lbvserver.inspect}")
+
+    req = URI::encode('object= { "lbvserver":'+JSON.dump(lbvserver)+'}' )
+    method = :post
+    path = "/nitro/v1/config/lbvserver/"
+
+    resp = JSON.parse(@new_resource.connection.request(
+        :method=> method,
+        :path=> path,
+        :body => req).body)
+
+    if resp["errorcode"] != 0
+      Chef::Log.error( "#{method} #{lbvserver_name} resp: #{resp.inspect}")
+      exit 1
+    else
+      Chef::Log.info( "#{method} #{lbvserver_name} resp: #{resp.inspect}")
+    end
+
+
+    # exit when > 2 ip for new lb vserver
+    if verify_ip(ip,lbvserver_name)
+      Chef::Log.info("ip: #{ip} verified")
+    else
+      Chef::Log.info("ip: #{ip} verify failed")
+      # remove self and exit - use workorder retry mechanism
+      delete_by_name(lbvserver_name)
+      # reduce contention
+      sleep_time = rand(300)
+      Chef::Log.info("sleeping rand(300) => #{sleep_time} due to ip contention")
+      sleep(sleep_time)
+      exit 1
+    end
+
+  else
+
+    # reuse existing ip for other lbvservers
+    node.set["ns_backup_lbvserver_ip"] = resp_obj["lbvserver"][0]["ipv46"]
+
+    Chef::Log.info( "lb exists: #{resp_obj.inspect}")
+    lbvserver_base = {
+        :name => lbvserver_name,
+        :ipv46 => node.ns_backup_lbvserver_ip,
+        :lbmethod => @new_resource.lbmethod
+    }
+
+    custom_attrs = {}
+    if node.workorder.rfcCi.ciAttributes.has_key?("lb_attrs")
+      custom_attrs = JSON.parse(node.workorder.rfcCi.ciAttributes.lb_attrs)
+    end
+    lbvserver = lbvserver_base.merge(custom_attrs)
+
+    if @new_resource.stickiness.nil?
+      Chef::Log.info("Not updating persistenceType because it was not specified")
+    else
+
+      if @new_resource.stickiness == "true"
+        if node.workorder.rfcCi.ciAttributes.enable_lb_group == "false"
+          lbvserver[:persistenceType] = @new_resource.persistence_type.upcase
+          lbvserver[:timeout] = 360
+        end
+      else
+        lbvserver[:persistenceType] = "NONE"
+      end
+
+    end
+
+    req = '{ "lbvserver": ['+JSON.dump(lbvserver)+'] }'
+    path = "/nitro/v1/config/lbvserver/#{lbvserver_name}"
+
+    Chef::Log.info("lbvserver update using: #{req}")
+
+    resp = JSON.parse(@new_resource.connection.request(
+        :method=> method,
+        :path=> path,
+        :body => req).body)
+
+    if resp["errorcode"] != 0
+      Chef::Log.error( "#{method} #{lbvserver_name} resp: #{resp.inspect}")
+      exit 1
+    else
+      Chef::Log.info( "#{method} #{lbvserver_name} resp: #{resp.inspect}")
+    end
+
+  end
+
+  # disable insecure ssl
+  if @new_resource.servicetype.upcase == "SSL"
+
+    sslvserver = {
+        :vServerName => lbvserver_name,
+        :ssl3 => "DISABLED"
+    }
+    req = '{ "sslvserver": ['+JSON.dump(sslvserver)+'] }'
+
+    resp_obj = JSON.parse(@new_resource.connection.request(
+        :method=>:put,
+        :path=>"/nitro/v1/config/sslvserver/#{lbvserver_name}",
+        :body => req).body)
+
+    if resp_obj["errorcode"] != 0
+      Chef::Log.error( "sslv3 off resp: #{resp_obj.inspect}")
+      exit 1
+    else
+      Chef::Log.info( "sslv3 off resp: #{resp_obj.inspect}")
+    end
+
+  end
+
+  resp_obj = JSON.parse(@new_resource.connection.request(
+      :method => :get,
+      :path => "/nitro/v1/config/lbvserver_responderpolicy_binding/#{lbvserver_name}").body)
+
+  Chef::Log.info("lbvserver_responderpolicy_binding #{resp_obj.inspect}")
+
+  lbvserver_responderpolicy_binding = {
+      :name => lbvserver_name,
+      :policyname => "Restrict_GSLB_prob_respol",
+      :priority => 10
+  }
+  req = '{ "lbvserver_responderpolicy_binding": ['+JSON.dump(lbvserver_responderpolicy_binding)+'] }'
+  resp_obj = JSON.parse(@new_resource.connection.request(
+      :method=>:put,
+      :path=>"/nitro/v1/config/lbvserver_responderpolicy_binding/#{lbvserver_name}",
+      :body => req).body)
+
+  if resp_obj["errorcode"] != 0
+    Chef::Log.error( "policyname not added to backup lbvserver #{resp_obj.inspect}")
+    exit 1
+  else
+    Chef::Log.info( "Policyname added #{resp_obj.inspect}")
+  end
+
+  Chef::Log.debug("After lbvserver_responderpolicy_binding #{resp_obj.inspect}")
 end
 
 
 action :create do
    create_lbvserver
+end
+
+action :backup_create do
+  create_backup_lbvserver
 end
 
 action :delete do

@@ -10,7 +10,7 @@ if certs.nil? || certs.size==0
 end
 
 has_ssl = false
-lbs = [] + node.loadbalancers + node.dcloadbalancers
+lbs = [] + node.loadbalancers + node.dcloadbalancers + node.backup_dcloadbalancers
 lbs.each do |lb|
   next if lb["vprotocol"] != "SSL"
   has_ssl = true
@@ -191,7 +191,7 @@ if !ssh.nil?
 end
 
 
-lbs = [] + node.loadbalancers + node.dcloadbalancers
+lbs = [] + node.loadbalancers + node.dcloadbalancers + node.backup_dcloadbalancers
 lbs.each do |lb|
 
   next if lb[:vprotocol] != "SSL"

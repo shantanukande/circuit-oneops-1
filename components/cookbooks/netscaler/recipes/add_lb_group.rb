@@ -10,6 +10,7 @@ if !node.workorder.rfcCi.ciAttributes.has_key?("enable_lb_group") ||
    
    Chef::Log.info("no lbgroup")
    include_recipe "netscaler::delete_lb_group"
+   include_recipe "netscaler::backup_delete_lb_group"
    return
 end
 
@@ -19,13 +20,14 @@ if node.workorder.rfcCi.ciBaseAttributes.has_key?("cookie_domain") &&
    node.workorder.rfcCi.ciAttributes.cookie_domain == "default")
    
   include_recipe "netscaler::delete_lb_group"
+  include_recipe "netscaler::backup_delete_lb_group"
 end
 
 
 lbgroup_name = node.workorder.rfcCi.ciName+'-'+node.workorder.rfcCi.ciId.to_s
 
 # bind each loadbalancer
-node.loadbalancers.each do |lb|
+(node.loadbalancers + node.backup_dcloadbalancers).each do |lb|
   binding = {
     :name => lbgroup_name,
     :vservername => lb[:name]

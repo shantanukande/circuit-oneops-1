@@ -346,8 +346,44 @@ class Library
 
   def build_entry_list
 
+    if $node['workorder']['rfcCi']['rfcAction'] == "delete"
+      $node.set['dns_action'] = "delete"
+    end
+
+
     cloud_name = $node['workorder']['cloud']['ciName']
     service_attrs = get_dns_service
+
+    if $node['workorder']['services'].has_key?('gdns')
+      cloud_service =  $node['workorder']['services']['gdns'][cloud_name]
+    end
+
+    $node.set["is_last_active_cloud_in_dc"] = true
+    if $node['workorder']['box']['ciAttributes'].has_key?("is_platform_enabled") &&
+        $node['workorder']['box']['ciAttributes']['is_platform_enabled'] == 'true' &&
+        $node['workorder']['payLoad'].has_key?("activeclouds") && !cloud_service.nil?
+      $node['workorder']['payLoad']["activeclouds"].each do |service|
+
+        if service['ciAttributes'].has_key?("gslb_site_dns_id") &&
+            service['nsPath'] != cloud_service['nsPath'] &&
+            service['ciAttributes']['gslb_site_dns_id'] == cloud_service['ciAttributes']['gslb_site_dns_id']
+
+          $node.set['is_last_active_cloud_in_dc'] = false
+        end
+      end
+    end
+
+    $node.set["is_last_active_cloud"] = true
+    if $node['workorder']['box']['ciAttributes'].has_key?("is_platform_enabled") &&
+        $node['workorder']['box']['ciAttributes']['is_platform_enabled'] == 'true' &&
+        $node['workorder']['payLoad'].has_key?("activeclouds") && !cloud_service.nil?
+      $node['workorder']['payLoad']['activeclouds'].each do |service|
+
+        if service['nsPath'] != cloud_service['nsPath']
+          $node.set['is_last_active_cloud'] = false
+        end
+      end
+    end
 
     customer_domain = get_customer_domain
 
@@ -373,7 +409,8 @@ class Library
     provider = get_provider
 
     if env.has_key?("global_dns") && env["global_dns"] == "true" && depends_on_lb &&
-        !gdns_service.nil? && gdns_service["ciAttributes"]["gslb_authoritative_servers"] != '[]'
+        ((!gdns_service.nil? && gdns_service["ciAttributes"]["gslb_authoritative_servers"] != '[]') ||
+        ($node['is_last_active_cloud_in_dc'] && $node['dns_action'] == "delete"))
       if provider !~ /azuredns/
         get_gslb_domain
         get_dc_lbserver
