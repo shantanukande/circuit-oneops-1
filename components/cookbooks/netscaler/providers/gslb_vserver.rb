@@ -218,7 +218,8 @@ def create_gslb_vserver
 
     gslb_vserver = {
         :name => gslb_vserver_name,
-        :lbmethod => @new_resource.lbmethod
+        :lbmethod => @new_resource.lbmethod,
+        :ecs => "ENABLED"
     }
 
     gslbvserver = JSON.dump(gslb_vserver)
@@ -227,6 +228,22 @@ def create_gslb_vserver
         :method=>:put,
         :path=>"/nitro/v1/config/gslbvserver/#{gslb_vserver_name}/",
         :body => '{ "gslbvserver": ['+gslbvserver+'] }').body)
+
+    ##for netscaler which don't support ECS least NetScaler for ECS is 11.1
+    if resp_obj["errorcode"] == 278 && resp_obj["message"] =~ /Invalid argument \[ecs\]/
+      puts "***TAG:ecs_not_supported=#{node['netscaler_host_ip']}"
+      gslb_vserver = {
+          :name => gslb_vserver_name,
+          :lbmethod => @new_resource.lbmethod
+      }
+
+      gslbvserver = JSON.dump(gslb_vserver)
+
+      resp_obj = JSON.parse(conn.request(
+          :method=>:put,
+          :path=>"/nitro/v1/config/gslbvserver/#{gslb_vserver_name}/",
+          :body => '{ "gslbvserver": ['+gslbvserver+'] }').body)
+    end
 
     if resp_obj["errorcode"] != 0
       Chef::Log.error( "put #{gslb_vserver_name} resp: #{resp_obj.inspect}")
